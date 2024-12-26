@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "_cgo_export.h"
 #include <security/pam_appl.h>
+#include <stdint.h>
 #include <string.h>
 
 #ifdef __sun
@@ -9,29 +10,23 @@
 #define PAM_CONST const
 #endif
 
-int cb_pam_conv(
-	int num_msg,
-	PAM_CONST struct pam_message **msg,
-	struct pam_response **resp,
-	void *appdata_ptr)
+int cb_pam_conv(int num_msg, PAM_CONST struct pam_message **msg, struct pam_response **resp, void *appdata_ptr)
 {
-	*resp = calloc(num_msg, sizeof **resp);
-	if (num_msg <= 0 || num_msg > PAM_MAX_NUM_MSG) {
+	if (num_msg <= 0 || num_msg > PAM_MAX_NUM_MSG)
 		return PAM_CONV_ERR;
-	}
-	if (!*resp) {
+
+	*resp = calloc(num_msg, sizeof **resp);
+	if (!*resp)
 		return PAM_BUF_ERR;
-	}
+
 	for (size_t i = 0; i < num_msg; ++i) {
-		struct cbPAMConv_return result = cbPAMConv(
-				msg[i]->msg_style,
-				(char *)msg[i]->msg,
-				(long)appdata_ptr);
-		if (result.r1 != PAM_SUCCESS) {
+		struct cbPAMConv_return result = cbPAMConv(msg[i]->msg_style, (char *)msg[i]->msg, (uintptr_t)appdata_ptr);
+		if (result.r1 != PAM_SUCCESS)
 			goto error;
-		}
+
 		(*resp)[i].resp = result.r0;
 	}
+
 	return PAM_SUCCESS;
 error:
 	for (size_t i = 0; i < num_msg; ++i) {
@@ -40,16 +35,17 @@ error:
 			free((*resp)[i].resp);
 		}
 	}
+
 	memset(*resp, 0, num_msg * sizeof *resp);
 	free(*resp);
 	*resp = NULL;
 	return PAM_CONV_ERR;
 }
 
-void init_pam_conv(struct pam_conv *conv, long c)
+void init_pam_conv(struct pam_conv *conv, uintptr_t appdata)
 {
 	conv->conv = cb_pam_conv;
-	conv->appdata_ptr = (void *)c;
+	conv->appdata_ptr = (void *)appdata;
 }
 
 // pam_start_confdir is a recent PAM api to declare a confdir (mostly for tests)
